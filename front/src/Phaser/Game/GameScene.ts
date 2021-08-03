@@ -89,6 +89,7 @@ import { SharedVariablesManager } from "./SharedVariablesManager";
 import { playersStore } from "../../Stores/PlayersStore";
 import { chatVisibilityStore } from "../../Stores/ChatStore";
 import { PropertyUtils } from "../Map/PropertyUtils";
+import { EmbeddedWebsiteManager } from "./EmbeddedWebsiteManager";
 
 export interface GameSceneInitInterface {
     initPosition: PointInterface | null;
@@ -201,7 +202,7 @@ export class GameScene extends DirtyScene {
     private startPositionCalculator!: StartPositionCalculator;
     private sharedVariablesManager!: SharedVariablesManager;
     private objectsByType = new Map<string, ITiledMapObject[]>();
-    private inMapIframes = new Array<HTMLIFrameElement>();
+    private embeddedWebsiteManager!: EmbeddedWebsiteManager;
 
     constructor(private room: Room, MapUrlFile: string, customKey?: string | undefined) {
         super({
@@ -417,6 +418,7 @@ export class GameScene extends DirtyScene {
 
     //hook create scene
     create(): void {
+        console.log("GAAAAAAAGAGAGAGAGA");
         this.preloading = false;
         this.trackDirtyAnims();
 
@@ -458,6 +460,8 @@ export class GameScene extends DirtyScene {
         //permit to set bound collision
         this.physics.world.setBounds(0, 0, this.Map.widthInPixels, this.Map.heightInPixels);
 
+        this.embeddedWebsiteManager = new EmbeddedWebsiteManager(this);
+
         //add layer on map
         this.gameMap = new GameMap(this.mapFile, this.Map, this.Terrains);
         for (const layer of this.gameMap.flatLayers) {
@@ -485,26 +489,20 @@ export class GameScene extends DirtyScene {
                             object.properties,
                             'in the "' + object.name + '" object of type "website"'
                         );
-                        const absoluteUrl = new URL(url, this.MapUrlFile).toString();
+                        const allowApi = PropertyUtils.findBooleanProperty("allowApi", object.properties);
 
-                        const iframe = document.createElement("iframe");
-                        iframe.src = absoluteUrl;
-                        iframe.style.width = object.width + "px";
-                        iframe.style.height = object.height + "px";
-                        iframe.style.margin = "0";
-                        iframe.style.padding = "0";
-                        iframe.style.border = "none";
-
-                        this.add.dom(object.x, object.y).setElement(iframe).setOrigin(0, 0);
-
-                        const allowApi = PropertyUtils.findBooleanProperty(
-                            "allowApi",
-                            object.properties,
+                        // TODO: add a "allow" property to iframe
+                        this.embeddedWebsiteManager.createEmbeddedWebsite(
+                            object.name,
+                            url,
+                            object.x,
+                            object.y,
+                            object.width,
+                            object.height,
+                            object.visible,
+                            allowApi ?? false,
+                            ""
                         );
-                        if (allowApi) {
-                            iframeListener.registerIframe(iframe);
-                            this.inMapIframes.push(iframe);
-                        }
                     }
                 }
             }
@@ -1114,6 +1112,26 @@ ${escapedMessage}
                 }
             })
         );
+        this.iframeSubscriptionList.push(
+            iframeListener.modifyEmbeddedWebsiteStream.subscribe((embeddedWebsite) => {
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+                // TODO
+            })
+        );
     }
 
     private setPropertyLayer(
@@ -1181,7 +1199,7 @@ ${escapedMessage}
         let targetRoom: Room;
         try {
             targetRoom = await Room.createRoom(roomUrl);
-        } catch (e: unknown) {
+        } catch (e /*: unknown*/) {
             console.error('Error while fetching new room "' + roomUrl.toString() + '"', e);
             this.mapTransitioning = false;
             return;
@@ -1220,9 +1238,6 @@ ${escapedMessage}
         for (const script of scripts) {
             iframeListener.unregisterScript(script);
         }
-        for (const iframe of this.inMapIframes) {
-            iframeListener.unregisterIframe(iframe);
-        }
 
         this.stopJitsi();
         audioManager.unloadAudio();
@@ -1239,6 +1254,7 @@ ${escapedMessage}
         this.biggestAvailableAreaStoreUnsubscribe();
         iframeListener.unregisterAnswerer("getState");
         this.sharedVariablesManager?.close();
+        this.embeddedWebsiteManager?.close();
 
         mediaManager.hideGameOverlay();
 
@@ -1310,7 +1326,7 @@ ${escapedMessage}
         try {
             const room = await Room.createRoom(exitRoomPath);
             return gameManager.loadMap(room, this.scene);
-        } catch (e: unknown) {
+        } catch (e /*: unknown*/) {
             console.warn('Error while pre-loading exit room "' + exitRoomPath.toString() + '"', e);
         }
     }
